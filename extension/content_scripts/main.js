@@ -99,23 +99,24 @@
   }
 
   async function fetchRating(title, year) {
-    const baseUrl = config.backendUrl.replace(/\/$/, '');
-    const url = new URL(`${baseUrl}/api/omdb`);
-    url.searchParams.append('title', title);
-    if (year) url.searchParams.append('year', year);
-
-    const res = await fetch(url.toString(), {
-      headers: {
-        'x-streamratings-secret': config.secret
-      }
+    // Use service worker to make API call (avoids CORS issues)
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({
+        action: 'fetchRating',
+        title,
+        year,
+        backendUrl: config.backendUrl,
+        secret: config.secret
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (response.success) {
+          resolve(response.data);
+        } else {
+          reject(new Error(response.error));
+        }
+      });
     });
-
-    if (!res.ok) {
-      if (res.status === 401) throw new Error("Unauthorized");
-      throw new Error(`API Error: ${res.status}`);
-    }
-
-    return await res.json();
   }
 
   // --- Main Logic ---
