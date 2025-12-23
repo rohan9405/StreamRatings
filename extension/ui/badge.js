@@ -25,6 +25,7 @@ const UI = {
       badge.textContent = "—";
       badge.classList.remove('sr-loading');
       badge.classList.add('sr-not-found');
+      badge.title = "Rating not found in IMDb database";
       return;
     }
 
@@ -32,19 +33,16 @@ const UI = {
     badge.classList.remove('sr-loading');
     badge.classList.add('sr-rated');
     
-    // Create detailed tooltip
+    // Create detailed tooltip with year, genre, and link info
     const imdbLink = data.imdbID ? `https://www.imdb.com/title/${data.imdbID}/` : null;
-    badge.title = `${data.title} (${data.year})`;
+    const tooltipParts = [
+      `${data.title} (${data.year})`,
+      data.genre ? `Genre: ${data.genre}` : null,
+      `Rating: ${data.imdbRating} (${data.imdbVotes || 'N/A'} votes)`,
+      imdbLink ? `Click to open IMDb` : null
+    ].filter(Boolean);
     
-    // Add hover tooltip with more details
-    badge.setAttribute('data-title', data.title);
-    badge.setAttribute('data-year', data.year);
-    badge.setAttribute('data-genre', data.genre || 'N/A');
-    badge.setAttribute('data-rating', data.imdbRating);
-    badge.setAttribute('data-votes', data.imdbVotes || 'N/A');
-    if (imdbLink) {
-      badge.setAttribute('data-imdb-link', imdbLink);
-    }
+    badge.title = tooltipParts.join('\n');
     
     // Click to open IMDb
     if (imdbLink) {
