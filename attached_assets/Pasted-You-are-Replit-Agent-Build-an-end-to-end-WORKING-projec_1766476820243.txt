@@ -1,0 +1,172 @@
+You are Replit Agent. Build an end-to-end WORKING project that includes:
+1) A Chrome Extension (Manifest V3) that overlays IMDb ratings on streaming title cards.
+2) A secure backend API (hosted in this same Replit project) that proxies OMDb requests so the API key is NEVER exposed to the extension.
+
+Project name: StreamRatings
+MVP goal: On Netflix / Prime Video / Hotstar browse pages, show a small rating badge on each title card. Must work end-to-end.
+
+========================
+FUNCTIONAL REQUIREMENTS
+========================
+Target sites (Phase 1):
+- https://www.netflix.com/*
+- https://www.primevideo.com/*
+- https://www.hotstar.com/*
+
+Badge behavior:
+- For each visible movie/series card, inject a small pill badge in the top-left corner.
+- Badge states: "…" (loading) -> "8.2" (rating) OR "—" (not found).
+- On hover: tooltip shows Title, Year (if found), IMDb rating, IMDb votes.
+- On click (if imdbID exists): open https://www.imdb.com/title/<imdbID>/ in a new tab.
+- Must NOT break site interactions (clicking the card must still work). Keep the badge lightweight and non-intrusive.
+
+Optional (nice-to-have but do if easy):
+- “Dim below threshold” feature (default threshold = 6.5).
+- Toggle per site (enable/disable Netflix/Prime/Hotstar).
+
+========================
+DATA + SECURITY
+========================
+Use OMDb as the rating source.
+- Create backend route: GET /api/omdb?title=<title>&year=<year_optional>
+- Backend reads OMDB_API_KEY from Replit Secrets (never in frontend/extension).
+- Add a second Replit secret: STREAMRATINGS_SECRET
+- The extension must store:
+  - BACKEND_BASE_URL (string)
+  - STREAMRATINGS_SECRET (string)
+  via an Options page. Do NOT hardcode these in content scripts.
+
+Every backend request MUST include:
+- header: x-streamratings-secret: <value from options>
+
+Backend must validate secret or return 401.
+
+CORS:
+- Allow requests from chrome-extension:// origins.
+- Reject others.
+
+========================
+PERFORMANCE REQUIREMENTS
+========================
+Client-side caching:
+- Use chrome.storage.local (or IndexedDB).
+- Cache key: normalizedTitle + ":" + year (year optional).
+- Store: { imdbRating, imdbVotes, imdbID, found, ts }
+- TTL: 7 days
+- Cache “not found” too.
+
+Server-side caching:
+- In-memory cache Map with TTL 24 hours (optional file persistence if easy).
+- Key: normalizedTitle + ":" + year
+
+Concurrency + de-dupe:
+- Do NOT fire a request per card at once.
+- Max 5 concurrent network calls.
+- De-dupe in-flight requests: same key shares a single promise.
+- Use MutationObserver to handle infinite scroll/lazy load, but debounce scans.
+
+========================
+EXTENSION STRUCTURE (MUST FOLLOW)
+========================
+/extension
+  manifest.json
+  background/
+    service_worker.js (minimal; optional if needed)
+  content_scripts/
+    main.js
+  adapters/
+    netflix.js
+    prime.js
+    hotstar.js
+  ui/
+    badge.css
+    badge.js
+  options/
+    options.html
+    options.js
+    options.css
+
+Adapters must expose:
+- findCards(): NodeList/Array of card elements
+- extractTitle(card): string | null
+- extractYear(card): string | null (optional)
+- getStableKey(card): string (fallback if title missing)
+
+UI module must:
+- createBadge(card)
+- updateBadge(badgeEl, state)
+- attachTooltip(badgeEl, data)
+
+Manifest V3:
+- content_scripts for the 3 domains
+- permissions: "storage"
+- host_permissions: include BACKEND_BASE_URL wildcard once user sets it (use "<all_urls>" only if necessary; prefer specific).
+- options_page set to /extension/options/options.html
+
+========================
+BACKEND STRUCTURE
+========================
+/server
+  index.js
+  cache.js
+  rateLimit.js
+
+Backend implementation:
+- Use Node + Express (simple).
+- Routes:
+  - GET /health -> { ok: true }
+  - GET /api/omdb -> validates secret, rate limits per IP (e.g., 60/min), caches, calls OMDb.
+- OMDb call:
+  - https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(title)}&y=${year}
+- Response JSON shape:
+  {
+    query: { title, year },
+    found: boolean,
+    title: string|null,
+    year: string|null,
+    imdbRating: string|null,
+    imdbVotes: string|null,
+    imdbID: string|null,
+    source: "omdb"
+  }
+
+Input validation:
+- title required, trim, 1..120 chars, strip weird control chars.
+- year optional, must be 4 digits if present.
+
+========================
+README (REQUIRED)
+========================
+Create a clear README.md that includes:
+- What it does + demo steps
+- How to set Replit Secrets: OMDB_API_KEY and STREAMRATINGS_SECRET
+- How to run backend on Replit
+- How to get the backend URL (Replit webview/deploy URL)
+- How to load unpacked extension in Chrome:
+  chrome://extensions -> Developer mode -> Load unpacked -> select /extension
+- How to configure extension options (backend URL + secret + toggles)
+- Testing checklist for Netflix/Prime/Hotstar
+- Known limitations + how to add a new streaming site adapter
+
+========================
+BUILD ORDER (DO THIS)
+========================
+1) Scaffold repo folders as specified.
+2) Implement backend (/health, /api/omdb) with secret validation, caching, rate limit.
+3) Create extension manifest + options page to store backend URL/secret + feature toggles.
+4) Implement content script main.js:
+   - detect site -> choose adapter
+   - scan cards -> inject badge
+   - cache lookup -> fetch if needed
+   - concurrency limiting + in-flight de-dupe
+   - MutationObserver with debounce
+5) Implement adapters in this order:
+   - Netflix first
+   - Prime second
+   - Hotstar third
+6) Polish UI (badge + tooltip + dim below threshold).
+7) Final pass on README.
+
+DO NOT ASK ME QUESTIONS.
+If a site DOM is brittle, implement best-effort extraction using aria-label/alt/text, and skip gracefully when title not found.
+Deliver a working MVP that I can load unpacked and see ratings appear.
