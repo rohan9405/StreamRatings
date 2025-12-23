@@ -1,4 +1,5 @@
 (async function() {
+  console.log("[SR] Content script loaded");
   const STORAGE_KEY_PREFIX = "sr_cache_";
   const CONFIG_KEY = "sr_config";
   const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -13,21 +14,22 @@
     const result = await chrome.storage.local.get(CONFIG_KEY);
     if (result[CONFIG_KEY]) {
       config = result[CONFIG_KEY];
-      console.log("StreamRatings: Config loaded from local storage", {
+      console.log("[SR] ✅ Config loaded:", {
         backendUrl: config.backendUrl,
         hasSecret: !!config.secret
       });
     } else {
-      console.warn("StreamRatings: No config found in local storage");
+      console.warn("[SR] ❌ No config in storage");
     }
   } catch (e) {
-    console.error("Failed to load config from storage", e);
+    console.error("[SR] Config load failed:", e);
   }
 
   if (!config.backendUrl || !config.secret) {
-    console.log("StreamRatings: Missing configuration. Please open extension Options and set Backend URL and Secret.");
+    console.log("[SR] ❌ Missing config - open extension Options to configure");
     return;
   }
+  console.log("[SR] ✅ Config valid, starting scan...");
 
   // --- De-duplication & Concurrency ---
   const inFlightRequests = new Map(); // key -> Promise
@@ -99,6 +101,7 @@
   }
 
   async function fetchRating(title, year) {
+    console.log(`[SR] fetchRating via service worker: "${title}" (${year})`);
     // Use service worker to make API call (avoids CORS issues)
     return new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({
@@ -109,11 +112,17 @@
         secret: config.secret
       }, (response) => {
         if (chrome.runtime.lastError) {
+          console.error(`[SR] Service worker error for "${title}":`, chrome.runtime.lastError.message);
           reject(new Error(chrome.runtime.lastError.message));
-        } else if (response.success) {
+        } else if (response && response.success) {
+          console.log(`[SR] ✅ Got rating for "${title}":`, response.data.imdbRating || "N/A");
           resolve(response.data);
-        } else {
+        } else if (response) {
+          console.error(`[SR] Service worker failed for "${title}":`, response.error);
           reject(new Error(response.error));
+        } else {
+          console.error(`[SR] No response from service worker for "${title}"`);
+          reject(new Error("No response from service worker"));
         }
       });
     });
