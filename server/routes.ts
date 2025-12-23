@@ -54,8 +54,9 @@ function findBestMatch(query: string, results: any[]): any | null {
     }
   }
 
-  const threshold = Math.max(query.length / 2, 3);
-  const accepted = bestScore < threshold;
+  // More lenient threshold: allow distance up to 60% of query length
+  const threshold = Math.max(query.length * 0.6, 5);
+  const accepted = bestScore <= threshold;
   const similarity = ((query.length - bestScore) / query.length * 100).toFixed(1);
   
   console.log(`[OMDb Fuzzy] Best match: "${bestMatch.Title}" - Distance: ${bestScore}, Similarity: ${similarity}%, Threshold: ${threshold}, Accepted: ${accepted}`);
