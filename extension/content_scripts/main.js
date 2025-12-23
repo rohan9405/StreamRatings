@@ -36,7 +36,7 @@
   let activeRequests = 0;
   const MAX_CONCURRENT = 1; // Sequential only to avoid rate limiting
   const requestQueue = [];
-  const DELAY_MS = 100; // Small delay between requests
+  const DELAY_MS = 500; // 500ms delay = ~2 requests/second = 120/minute
 
   function processQueue() {
     if (activeRequests >= MAX_CONCURRENT || requestQueue.length === 0) return;
