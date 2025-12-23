@@ -22,6 +22,26 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// CORS middleware for Chrome Extension
+app.use((req, res, next) => {
+  const origin = req.headers.origin || "";
+  
+  // Allow chrome-extension:// origins and localhost
+  if (origin.startsWith("chrome-extension://") || origin.includes("localhost") || origin.includes("127.0.0.1") || origin.includes("replit.app")) {
+    res.header("Access-Control-Allow-Origin", origin);
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type, x-streamratings-secret");
+    res.header("Access-Control-Allow-Credentials", "true");
+  }
+  
+  // Handle preflight
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  
+  next();
+});
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
