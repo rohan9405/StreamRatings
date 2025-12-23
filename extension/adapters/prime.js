@@ -26,46 +26,35 @@ const PrimeAdapter = {
   },
 
   extractTitle(card) {
-    let title = null;
-    
     // Data attributes first (most reliable)
     if (card.getAttribute('data-card-title')) {
-      title = card.getAttribute('data-card-title');
+      return card.getAttribute('data-card-title');
     }
+    
     // Aria-label on the card itself
-    else if (card.getAttribute('aria-label')) {
-      title = card.getAttribute('aria-label');
+    if (card.getAttribute('aria-label')) {
+      return card.getAttribute('aria-label');
     }
+    
     // Image alt tag
-    else {
-      const img = card.querySelector('img');
-      if (img && img.alt && img.alt.length > 1) {
-        title = img.alt;
-      }
+    const img = card.querySelector('img');
+    if (img && img.alt && img.alt.length > 1) {
+      return img.alt;
     }
+    
     // Aria label on links
-    if (!title) {
-      const link = card.querySelector('a[aria-label]');
-      if (link) {
-        title = link.getAttribute('aria-label');
-      }
+    const link = card.querySelector('a[aria-label]');
+    if (link) {
+      return link.getAttribute('aria-label');
     }
+    
     // Title text elements
-    if (!title) {
-      const titleEl = card.querySelector('[data-testid="title"], .av-packshot-title, .DVWebNode-card-title');
-      if (titleEl && titleEl.textContent) {
-        title = titleEl.textContent.trim();
-      }
+    const titleEl = card.querySelector('[data-testid="title"], .av-packshot-title, .DVWebNode-card-title');
+    if (titleEl && titleEl.textContent) {
+      return titleEl.textContent.trim();
     }
 
-    if (!title) return null;
-    
-    // Clean up title - remove "- Season X" suffix for better OMDb matching
-    title = title.replace(/\s*[-–]\s*Season\s*\d+/i, '').trim();
-    // Also remove "Season X" without dash
-    title = title.replace(/\s+Season\s*\d+$/i, '').trim();
-    
-    return title;
+    return null;
   },
 
   extractYear(card) {
