@@ -73,6 +73,13 @@ export async function registerRoutes(
       const response = await fetch(url.toString());
       const data = await response.json();
 
+      console.log(`[OMDb] Response for "${title}":`, {
+        Response: data.Response,
+        Title: data.Title,
+        imdbRating: data.imdbRating,
+        Error: data.Error
+      });
+
       const found = data.Response === "True";
       
       const result = {
