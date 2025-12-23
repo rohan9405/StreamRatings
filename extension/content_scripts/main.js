@@ -34,8 +34,9 @@
   // --- De-duplication & Concurrency ---
   const inFlightRequests = new Map(); // key -> Promise
   let activeRequests = 0;
-  const MAX_CONCURRENT = 2; // Reduced to avoid rate limiting
+  const MAX_CONCURRENT = 1; // Sequential only to avoid rate limiting
   const requestQueue = [];
+  const DELAY_MS = 100; // Small delay between requests
 
   function processQueue() {
     if (activeRequests >= MAX_CONCURRENT || requestQueue.length === 0) return;
@@ -43,23 +44,26 @@
     const { key, title, year, resolve, reject } = requestQueue.shift();
     activeRequests++;
 
-    fetchRating(title, year)
-      .then(data => {
-        // Cache it
-        const cacheEntry = {
-          data,
-          ts: Date.now()
-        };
-        const storageObj = {};
-        storageObj[STORAGE_KEY_PREFIX + key] = cacheEntry;
-        chrome.storage.local.set(storageObj);
-        resolve(data);
-      })
-      .catch(reject)
-      .finally(() => {
-        activeRequests--;
-        processQueue();
-      });
+    // Add small delay before fetching to smooth out request load
+    setTimeout(() => {
+      fetchRating(title, year)
+        .then(data => {
+          // Cache it
+          const cacheEntry = {
+            data,
+            ts: Date.now()
+          };
+          const storageObj = {};
+          storageObj[STORAGE_KEY_PREFIX + key] = cacheEntry;
+          chrome.storage.local.set(storageObj);
+          resolve(data);
+        })
+        .catch(reject)
+        .finally(() => {
+          activeRequests--;
+          processQueue();
+        });
+    }, DELAY_MS);
   }
 
   function getRating(title, year) {
