@@ -77,3 +77,39 @@ button:hover {
 
 .success { color: #16a34a; }
 .error { color: #dc2626; }
+.info { color: #2563eb; }
+
+.divider {
+  border: none;
+  border-top: 1px solid #e4e4e7;
+  margin: 24px 0;
+}
+
+.cache-section h2 {
+  font-size: 18px;
+  margin-bottom: 12px;
+}
+
+.cache-info {
+  font-size: 13px;
+  color: #71717a;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.btn-secondary {
+  background: #f4f4f5;
+  color: #18181b;
+  border: 1px solid #d4d4d8;
+}
+
+.btn-secondary:hover {
+  background: #e4e4e7;
+}
+
+#cacheStatus {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 14px;
+  min-height: 20px;
+}
