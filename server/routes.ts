@@ -41,16 +41,26 @@ function findBestMatch(query: string, results: any[]): any | null {
   let bestMatch = results[0];
   let bestScore = levenshteinDistance(query.toLowerCase(), results[0].Title.toLowerCase());
 
-  for (let i = 1; i < results.length; i++) {
+  console.log(`[OMDb Fuzzy] Searching for "${query}" among ${results.length} results:`);
+
+  for (let i = 0; i < results.length && i < 5; i++) {
     const distance = levenshteinDistance(query.toLowerCase(), results[i].Title.toLowerCase());
+    const similarity = ((query.length - distance) / query.length * 100).toFixed(1);
+    console.log(`  [${i}] "${results[i].Title}" (${results[i].Type}) - Distance: ${distance}, Similarity: ${similarity}%`);
+    
     if (distance < bestScore) {
       bestScore = distance;
       bestMatch = results[i];
     }
   }
 
-  // Only accept if reasonably close (arbitrary threshold)
-  return bestScore < Math.max(query.length / 2, 3) ? bestMatch : null;
+  const threshold = Math.max(query.length / 2, 3);
+  const accepted = bestScore < threshold;
+  const similarity = ((query.length - bestScore) / query.length * 100).toFixed(1);
+  
+  console.log(`[OMDb Fuzzy] Best match: "${bestMatch.Title}" - Distance: ${bestScore}, Similarity: ${similarity}%, Threshold: ${threshold}, Accepted: ${accepted}`);
+  
+  return accepted ? bestMatch : null;
 }
 
 export async function registerRoutes(
@@ -129,21 +139,34 @@ export async function registerRoutes(
       let found = data.Response === "True";
       let matchedData = data;
 
+      console.log(`[OMDb] Exact match result for "${title}":`, {
+        found,
+        Title: data.Title || "N/A",
+        Year: data.Year || "N/A",
+        imdbRating: data.imdbRating || "N/A"
+      });
+
       // If exact match failed, try search API for fuzzy matching
       if (!found) {
         console.log(`[OMDb] Exact match failed for "${title}", trying search API...`);
         const searchUrl = new URL(OMDB_API_URL);
         searchUrl.searchParams.append("apikey", apiKey);
         searchUrl.searchParams.append("s", title);
-        searchUrl.searchParams.append("type", "movie");
+        // Don't restrict to movie - include TV series, episodes, etc.
 
         const searchResponse = await fetch(searchUrl.toString());
         const searchData = await searchResponse.json();
 
+        console.log(`[OMDb] Search API returned:`, {
+          Response: searchData.Response,
+          totalResults: searchData.totalResults,
+          numSearchResults: searchData.Search ? searchData.Search.length : 0
+        });
+
         if (searchData.Response === "True" && searchData.Search && searchData.Search.length > 0) {
           const bestMatch = findBestMatch(title, searchData.Search);
           if (bestMatch) {
-            console.log(`[OMDb] Found fuzzy match: "${bestMatch.Title}"`);
+            console.log(`[OMDb] Found fuzzy match: "${bestMatch.Title}" (${bestMatch.Type}, ${bestMatch.Year})`);
             // Fetch full details for the matched title
             const detailUrl = new URL(OMDB_API_URL);
             detailUrl.searchParams.append("apikey", apiKey);
@@ -152,7 +175,17 @@ export async function registerRoutes(
             const detailResponse = await fetch(detailUrl.toString());
             matchedData = await detailResponse.json();
             found = matchedData.Response === "True";
+            console.log(`[OMDb] Fetched details for fuzzy match:`, {
+              found,
+              Title: matchedData.Title || "N/A",
+              Year: matchedData.Year || "N/A",
+              imdbRating: matchedData.imdbRating || "N/A"
+            });
+          } else {
+            console.log(`[OMDb] No fuzzy match found (threshold too strict)`);
           }
+        } else {
+          console.log(`[OMDb] Search API returned no results for "${title}"`);
         }
       }
 
