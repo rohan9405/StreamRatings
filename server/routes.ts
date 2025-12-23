@@ -77,11 +77,16 @@ export async function registerRoutes(
   });
 
   app.get(api.omdb.get.path, async (req, res) => {
-    // 1. Validate Secret
+    // 1. Validate Secret (skip for same-origin requests from the landing page)
     const clientSecret = req.headers["x-streamratings-secret"];
     const serverSecret = process.env.STREAMRATINGS_SECRET;
-
-    if (!serverSecret || clientSecret !== serverSecret) {
+    const origin = req.headers.origin || req.headers.referer || "";
+    const host = req.headers.host || "";
+    
+    // Allow same-origin requests (landing page demo) without secret
+    const isSameOrigin = origin.includes(host) || origin.includes("replit");
+    
+    if (!isSameOrigin && (!serverSecret || clientSecret !== serverSecret)) {
       return res.status(401).json({ message: "Invalid or missing secret" });
     }
 
