@@ -48,14 +48,17 @@
     setTimeout(() => {
       fetchRating(title, year)
         .then(data => {
-          // Cache it
-          const cacheEntry = {
-            data,
-            ts: Date.now()
-          };
-          const storageObj = {};
-          storageObj[STORAGE_KEY_PREFIX + key] = cacheEntry;
-          chrome.storage.local.set(storageObj);
+          // Cache ONLY successful lookups (found: true)
+          // Unsuccessful lookups (found: false) are NOT cached, so we retry them later
+          if (data.found === true) {
+            const cacheEntry = {
+              data,
+              ts: Date.now()
+            };
+            const storageObj = {};
+            storageObj[STORAGE_KEY_PREFIX + key] = cacheEntry;
+            chrome.storage.local.set(storageObj);
+          }
           resolve(data);
         })
         .catch(reject)
@@ -75,13 +78,19 @@
     }
 
     const promise = new Promise(async (resolve, reject) => {
-      // 2. Check Local Storage
+      // 2. Check Local Storage (only use cache if rating WAS found)
       try {
         const cacheKey = STORAGE_KEY_PREFIX + key;
         const result = await chrome.storage.local.get(cacheKey);
         const cached = result[cacheKey];
 
-        if (cached && (Date.now() - cached.ts < CACHE_TTL)) {
+        // Only use cache if:
+        // 1. Data exists
+        // 2. Still within TTL
+        // 3. The rating WAS found (found: true)
+        if (cached && 
+            (Date.now() - cached.ts < CACHE_TTL) && 
+            cached.data.found === true) {
           resolve(cached.data);
           return;
         }
