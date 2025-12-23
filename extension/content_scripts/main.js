@@ -34,7 +34,7 @@
   // --- De-duplication & Concurrency ---
   const inFlightRequests = new Map(); // key -> Promise
   let activeRequests = 0;
-  const MAX_CONCURRENT = 5;
+  const MAX_CONCURRENT = 2; // Reduced to avoid rate limiting
   const requestQueue = [];
 
   function processQueue() {
@@ -155,11 +155,12 @@
       // Fetch Data
       getRating(title, year)
         .then(data => {
+          console.log(`[SR] Updating badge for "${title}":`, data);
           window.StreamRatingsUI.updateBadge(badge, data);
         })
         .catch(err => {
-          console.error("Rating fetch failed for", title, err);
-          badge.textContent = "Err";
+          console.error(`[SR] Rating fetch failed for "${title}":`, err.message);
+          badge.textContent = "—";
           badge.title = err.message;
         });
     });

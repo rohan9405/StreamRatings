@@ -29,8 +29,9 @@
 }
 
 .sr-badge.sr-not-found {
-  color: #aaa;
-  border-color: #444;
+  color: #888;
+  border-color: #555;
+  opacity: 0.7;
 }
 
 /* Tooltip Styles */
