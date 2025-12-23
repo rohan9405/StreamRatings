@@ -8,18 +8,24 @@
     secret: ""
   };
 
-  // Load config
+  // Load config from local storage (content scripts can't access sync)
   try {
-    const result = await chrome.storage.sync.get(CONFIG_KEY);
+    const result = await chrome.storage.local.get(CONFIG_KEY);
     if (result[CONFIG_KEY]) {
       config = result[CONFIG_KEY];
+      console.log("StreamRatings: Config loaded from local storage", {
+        backendUrl: config.backendUrl,
+        hasSecret: !!config.secret
+      });
+    } else {
+      console.warn("StreamRatings: No config found in local storage");
     }
   } catch (e) {
-    console.error("Failed to load config", e);
+    console.error("Failed to load config from storage", e);
   }
 
   if (!config.backendUrl || !config.secret) {
-    console.log("StreamRatings: Missing configuration. Please set Backend URL and Secret in Options.");
+    console.log("StreamRatings: Missing configuration. Please open extension Options and set Backend URL and Secret.");
     return;
   }
 

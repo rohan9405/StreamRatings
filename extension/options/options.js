@@ -14,34 +14,25 @@ function saveOptions() {
     return;
   }
 
-  // Request permission for the new backend URL
-  const origin = new URL(backendUrl).origin + "/*";
-
-  chrome.permissions.request({
-    origins: [origin]
-  }, (granted) => {
-    if (granted) {
-      chrome.storage.sync.set({
-        [CONFIG_KEY]: { backendUrl, secret }
-      }, () => {
-        status.textContent = 'Options saved.';
-        status.className = 'success';
-        setTimeout(() => {
-          status.textContent = '';
-        }, 2000);
-      });
-    } else {
-      status.textContent = 'Permission denied. Cannot fetch from that URL.';
-      status.className = 'error';
-    }
+  // Save to local storage (content scripts can access local, not sync)
+  chrome.storage.local.set({
+    [CONFIG_KEY]: { backendUrl, secret }
+  }, () => {
+    status.textContent = 'Options saved successfully!';
+    status.className = 'success';
+    console.log("StreamRatings config saved:", { backendUrl, hasSecret: !!secret });
+    setTimeout(() => {
+      status.textContent = '';
+    }, 2000);
   });
 }
 
 function restoreOptions() {
-  chrome.storage.sync.get(CONFIG_KEY, (items) => {
+  chrome.storage.local.get(CONFIG_KEY, (items) => {
     if (items[CONFIG_KEY]) {
       document.getElementById('backendUrl').value = items[CONFIG_KEY].backendUrl;
       document.getElementById('secret').value = items[CONFIG_KEY].secret;
+      console.log("StreamRatings config restored");
     }
   });
 }
