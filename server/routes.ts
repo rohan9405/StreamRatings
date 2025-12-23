@@ -54,12 +54,15 @@ function findBestMatch(query: string, results: any[]): any | null {
     }
   }
 
-  // More lenient threshold: allow distance up to 60% of query length
-  const threshold = Math.max(query.length * 0.6, 5);
-  const accepted = bestScore <= threshold;
+  // Fuzzy threshold: similarity must be at least 50% AND distance capped at 40% of query length
+  // For short titles (<5 chars), require exact or near-exact match
+  const minSimilarity = 0.5;
+  const actualSimilarity = (query.length - bestScore) / query.length;
+  const maxAllowedDistance = query.length < 5 ? 1 : Math.floor(query.length * 0.4);
+  const accepted = actualSimilarity >= minSimilarity && bestScore <= maxAllowedDistance;
   const similarity = ((query.length - bestScore) / query.length * 100).toFixed(1);
   
-  console.log(`[OMDb Fuzzy] Best match: "${bestMatch.Title}" - Distance: ${bestScore}, Similarity: ${similarity}%, Threshold: ${threshold}, Accepted: ${accepted}`);
+  console.log(`[OMDb Fuzzy] Best match: "${bestMatch.Title}" - Distance: ${bestScore}, Similarity: ${similarity}%, MaxDistance: ${maxAllowedDistance}, Accepted: ${accepted}`);
   
   return accepted ? bestMatch : null;
 }

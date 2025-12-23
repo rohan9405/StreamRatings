@@ -83,12 +83,18 @@ const UI = {
     badge.classList.remove('sr-loading');
     badge.classList.add('sr-rated');
     
-    // Create detailed tooltip HTML
+    // Create detailed tooltip with escaped content (XSS prevention)
     const imdbLink = data.imdbID ? `https://www.imdb.com/title/${data.imdbID}/` : null;
+    const escapeHtml = (str) => {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    };
     const tooltipHtml = `
-      <div style="font-weight:bold;color:#f5c518;margin-bottom:4px">${data.title} (${data.year})</div>
-      ${data.genre ? `<div style="color:#ccc;font-size:11px">${data.genre}</div>` : ''}
-      <div style="margin-top:6px;color:#fff">Rating: <strong style="color:#f5c518">${data.imdbRating}</strong> <span style="color:#888">(${data.imdbVotes || 'N/A'} votes)</span></div>
+      <div style="font-weight:bold;color:#f5c518;margin-bottom:4px">${escapeHtml(data.title)} (${escapeHtml(data.year)})</div>
+      ${data.genre ? `<div style="color:#ccc;font-size:11px">${escapeHtml(data.genre)}</div>` : ''}
+      <div style="margin-top:6px;color:#fff">Rating: <strong style="color:#f5c518">${escapeHtml(data.imdbRating)}</strong> <span style="color:#888">(${escapeHtml(data.imdbVotes) || 'N/A'} votes)</span></div>
       ${imdbLink ? '<div style="margin-top:6px;color:#f5c518;font-size:11px">Click to open IMDb</div>' : ''}
     `;
     
