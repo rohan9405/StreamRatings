@@ -30,21 +30,31 @@ const UI = {
 
     badge.textContent = data.imdbRating || "N/A";
     badge.classList.remove('sr-loading');
+    badge.classList.add('sr-rated');
     
-    // Add tooltip behavior
-    badge.title = `${data.title} (${data.year})\nRating: ${data.imdbRating}\nVotes: ${data.imdbVotes}`;
+    // Create detailed tooltip
+    const imdbLink = data.imdbID ? `https://www.imdb.com/title/${data.imdbID}/` : null;
+    badge.title = `${data.title} (${data.year})`;
+    
+    // Add hover tooltip with more details
+    badge.setAttribute('data-title', data.title);
+    badge.setAttribute('data-year', data.year);
+    badge.setAttribute('data-genre', data.genre || 'N/A');
+    badge.setAttribute('data-rating', data.imdbRating);
+    badge.setAttribute('data-votes', data.imdbVotes || 'N/A');
+    if (imdbLink) {
+      badge.setAttribute('data-imdb-link', imdbLink);
+    }
     
     // Click to open IMDb
-    if (data.imdbID) {
+    if (imdbLink) {
+      badge.style.cursor = 'pointer';
       badge.onclick = (e) => {
         e.stopPropagation();
         e.preventDefault();
-        window.open(`https://www.imdb.com/title/${data.imdbID}/`, '_blank');
+        window.open(imdbLink, '_blank');
       };
     }
-    
-    // Dimming logic if implemented
-    // if (parseFloat(data.imdbRating) < 6.5) { badge.style.opacity = '0.6'; }
   }
 };
 

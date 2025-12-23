@@ -14,13 +14,40 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.5);
   cursor: pointer;
   border: 1px solid #f5c518;
-  transition: opacity 0.2s;
+  transition: all 0.2s ease;
   pointer-events: auto; /* Ensure clicks are registered */
 }
 
 .sr-badge:hover {
   background-color: rgba(0, 0, 0, 0.95);
-  transform: scale(1.05);
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(245, 197, 24, 0.3);
+}
+
+.sr-badge::after {
+  content: attr(data-tooltip-text);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a1a;
+  color: #fff;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  white-space: nowrap;
+  z-index: 10001;
+  margin-bottom: 8px;
+  border: 1px solid #f5c518;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.7);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  font-weight: normal;
+}
+
+.sr-badge:hover::after {
+  opacity: 1;
 }
 
 .sr-badge.sr-loading {
@@ -32,9 +59,40 @@
   color: #888;
   border-color: #555;
   opacity: 0.7;
+  cursor: default;
 }
 
-/* Tooltip Styles */
+.sr-badge.sr-not-found:hover {
+  transform: none;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+/* Detailed Tooltip Styles - shown on hover */
+.sr-badge[data-title]:hover::before {
+  content: '';
+  position: absolute;
+  bottom: -100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0f0f0f;
+  color: #fff;
+  padding: 12px 14px;
+  border-radius: 6px;
+  font-size: 11px;
+  white-space: normal;
+  width: 240px;
+  z-index: 10001;
+  margin-top: 50px;
+  border: 1px solid #f5c518;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.8);
+  opacity: 1;
+  pointer-events: auto;
+  font-weight: normal;
+  text-align: left;
+  line-height: 1.4;
+}
+
+/* Tooltip content */
 .sr-tooltip {
   position: absolute;
   background: #1f1f1f;

@@ -7,6 +7,52 @@ import { z } from "zod";
 
 const OMDB_API_URL = "https://www.omdbapi.com/";
 
+// Simple fuzzy matching: Levenshtein distance
+function levenshteinDistance(str1: string, str2: string): number {
+  const track = Array(str2.length + 1).fill(null).map(() =>
+    Array(str1.length + 1).fill(null)
+  );
+
+  for (let i = 0; i <= str1.length; i += 1) {
+    track[0][i] = i;
+  }
+  for (let j = 0; j <= str2.length; j += 1) {
+    track[j][0] = j;
+  }
+
+  for (let j = 1; j <= str2.length; j += 1) {
+    for (let i = 1; i <= str1.length; i += 1) {
+      const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      track[j][i] = Math.min(
+        track[j][i - 1] + 1,
+        track[j - 1][i] + 1,
+        track[j - 1][i - 1] + indicator
+      );
+    }
+  }
+
+  return track[str2.length][str1.length];
+}
+
+// Find best match from search results
+function findBestMatch(query: string, results: any[]): any | null {
+  if (!results || results.length === 0) return null;
+
+  let bestMatch = results[0];
+  let bestScore = levenshteinDistance(query.toLowerCase(), results[0].Title.toLowerCase());
+
+  for (let i = 1; i < results.length; i++) {
+    const distance = levenshteinDistance(query.toLowerCase(), results[i].Title.toLowerCase());
+    if (distance < bestScore) {
+      bestScore = distance;
+      bestMatch = results[i];
+    }
+  }
+
+  // Only accept if reasonably close (arbitrary threshold)
+  return bestScore < Math.max(query.length / 2, 3) ? bestMatch : null;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -80,16 +126,45 @@ export async function registerRoutes(
         Error: data.Error
       });
 
-      const found = data.Response === "True";
-      
+      let found = data.Response === "True";
+      let matchedData = data;
+
+      // If exact match failed, try search API for fuzzy matching
+      if (!found) {
+        console.log(`[OMDb] Exact match failed for "${title}", trying search API...`);
+        const searchUrl = new URL(OMDB_API_URL);
+        searchUrl.searchParams.append("apikey", apiKey);
+        searchUrl.searchParams.append("s", title);
+        searchUrl.searchParams.append("type", "movie");
+
+        const searchResponse = await fetch(searchUrl.toString());
+        const searchData = await searchResponse.json();
+
+        if (searchData.Response === "True" && searchData.Search && searchData.Search.length > 0) {
+          const bestMatch = findBestMatch(title, searchData.Search);
+          if (bestMatch) {
+            console.log(`[OMDb] Found fuzzy match: "${bestMatch.Title}"`);
+            // Fetch full details for the matched title
+            const detailUrl = new URL(OMDB_API_URL);
+            detailUrl.searchParams.append("apikey", apiKey);
+            detailUrl.searchParams.append("i", bestMatch.imdbID);
+
+            const detailResponse = await fetch(detailUrl.toString());
+            matchedData = await detailResponse.json();
+            found = matchedData.Response === "True";
+          }
+        }
+      }
+
       const result = {
         query: { title, year },
         found,
-        title: found ? data.Title : null,
-        year: found ? data.Year : null,
-        imdbRating: found ? data.imdbRating : null,
-        imdbVotes: found ? data.imdbVotes : null,
-        imdbID: found ? data.imdbID : null,
+        title: found ? matchedData.Title : null,
+        year: found ? matchedData.Year : null,
+        genre: found ? matchedData.Genre : null,
+        imdbRating: found ? matchedData.imdbRating : null,
+        imdbVotes: found ? matchedData.imdbVotes : null,
+        imdbID: found ? matchedData.imdbID : null,
         source: "omdb" as const
       };
 
