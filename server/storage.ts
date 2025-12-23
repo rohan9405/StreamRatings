@@ -1,37 +1,35 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import { type OmdbResponse } from "@shared/schema";
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  getCachedRating(key: string): Promise<OmdbResponse | undefined>;
+  setCachedRating(key: string, data: OmdbResponse): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
-  private users: Map<string, User>;
+  private cache: Map<string, { data: OmdbResponse; expires: number }>;
+  private readonly TTL = 24 * 60 * 60 * 1000; // 24 hours
 
   constructor() {
-    this.users = new Map();
+    this.cache = new Map();
   }
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+  async getCachedRating(key: string): Promise<OmdbResponse | undefined> {
+    const item = this.cache.get(key);
+    if (!item) return undefined;
+
+    if (Date.now() > item.expires) {
+      this.cache.delete(key);
+      return undefined;
+    }
+
+    return item.data;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
-  }
-
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+  async setCachedRating(key: string, data: OmdbResponse): Promise<void> {
+    this.cache.set(key, {
+      data,
+      expires: Date.now() + this.TTL,
+    });
   }
 }
 

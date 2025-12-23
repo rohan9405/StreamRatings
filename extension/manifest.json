@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "StreamRatings",
+  "version": "1.0",
+  "description": "Overlays IMDb ratings on Netflix, Prime Video, and Hotstar.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://*.netflix.com/*",
+    "https://*.primevideo.com/*",
+    "https://*.hotstar.com/*",
+    "<all_urls>"
+  ],
+  "options_page": "options/options.html",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.netflix.com/*",
+        "https://*.primevideo.com/*",
+        "https://*.hotstar.com/*"
+      ],
+      "js": [
+        "content_scripts/main.js",
+        "adapters/netflix.js",
+        "adapters/prime.js",
+        "adapters/hotstar.js",
+        "ui/badge.js"
+      ],
+      "css": ["ui/badge.css"]
+    }
+  ],
+  "background": {
+    "service_worker": "background/service_worker.js"
+  }
+}
