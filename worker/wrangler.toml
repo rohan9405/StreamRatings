@@ -6,4 +6,4 @@ workers_dev = true
 [[d1_databases]]
 binding = "DB"
 database_name = "streamratings-cache"
-database_id = "REPLACE_AFTER_d1_create"
+database_id = "4d4406b5-79d6-4336-bf7a-a4dc5785adb9"

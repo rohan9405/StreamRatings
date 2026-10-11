@@ -68,6 +68,14 @@ If you'd rather keep the OMDb key off the browser, run the included Express serv
 
 ## How It Works
 
+- **Local cache → shared cache → OMDb.** Each browser keeps its own cache. On a local miss the
+  extension asks the StreamRatings shared cache (`worker/`, Cloudflare Worker + D1), which serves
+  any rating another user fetched recently. Only if nobody has, the shared cache fetches it from
+  OMDb with *your* key, stores it for everyone, and returns it. If the shared cache is down, the
+  extension asks OMDb directly.
+
+## Details
+
 - **Frontend (Extension)**: Scans page for title cards, injects badges, fetches ratings
 - **Backend (Replit)**: Receives requests with your secret key, calls OMDb API securely, caches results for 24 hours
 - **Caching**: Ratings are always served from the extension's cache first. A title is only re-fetched once its cache entry is due, based on release date:

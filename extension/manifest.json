@@ -22,7 +22,7 @@
   ],
   "host_permissions": [
     "https://www.omdbapi.com/*",
-    "https://streamratings-cache.workers.dev/*"
+    "https://streamratings-cache.rohan-trades-trump.workers.dev/*"
   ],
   "options_ui": {
     "page": "options/options.html",

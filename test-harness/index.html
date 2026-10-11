@@ -21,7 +21,7 @@ pre{background:#222;padding:10px;white-space:pre-wrap}
 <script>
 // Visible cards: real titles. Below-the-fold cards: must NOT be fetched until scrolled to.
 const VISIBLE = ["Inception", "Stranger Things", "Panchayat", "Always Home", "Kanguva", "zzqx nonexistent title 123"];
-const BELOW = Array.from({length: 24}, (_, i) => "Offscreen Title " + i);
+const BELOW = new URLSearchParams(location.search).get('offscreen') === '0' ? [] : Array.from({length: 24}, (_, i) => "Offscreen Title " + i);
 const mk = (parent, t) => { const d = document.createElement('div'); d.className = 'card'; d.dataset.title = t; d.textContent = t; parent.appendChild(d); };
 VISIBLE.forEach(t => mk(document.getElementById('grid'), t));
 BELOW.forEach(t => mk(document.getElementById('below'), t));
@@ -48,13 +48,17 @@ document.getElementById('clear').onclick = () => {
 
 // chrome.* shim backed by localStorage so the real extension files run unmodified
 const listeners = [];
+window.importScripts = () => {}; // shared/*.js are loaded as <script>s before the service worker
 window.chrome = {
-  storage: { local: {
+  action: { onClicked: { addListener() {} } },
+  storage: { onChanged: { addListener() {}, removeListener() {} }, local: {
     async get(k) { const s = store.read(); if (k === null) return s; const keys = Array.isArray(k) ? k : [k]; const o = {}; keys.forEach(x => { if (x in s) o[x] = s[x]; }); return o; },
     set(obj, cb) { const s = store.read(); Object.assign(s, obj); store.write(s); cb && cb(); return Promise.resolve(); }
   }},
   runtime: {
     lastError: null,
+    getURL: p => '../extension/' + p,
+    openOptionsPage() {},
     onInstalled: { addListener() {} },
     onMessage: { addListener(fn) { listeners.push(fn); } },
     sendMessage(msg, cb) { listeners[0](msg, {}, cb); }
@@ -65,7 +69,11 @@ window.chrome = {
 window.__omdbCalls = 0;
 window.__simulateQuota = false;
 const realFetch = window.fetch.bind(window);
+window.__worker = [];
 window.fetch = (url, opts) => {
+  if (String(url).includes('workers.dev')) {
+    return realFetch(url, opts).then(res => { res.clone().json().then(b => window.__worker.push(b.cache || ('error ' + res.status))).catch(() => {}); return res; });
+  }
   if (String(url).includes('omdbapi.com')) {
     window.__omdbCalls++;
     if (window.__simulateQuota) {
@@ -88,7 +96,9 @@ async function run(simulateQuota) {
   await window.__configReady;
   window.__simulateQuota = simulateQuota;
   window.__omdbCalls = 0;
-  await loadScript('../extension/content_scripts/cache_policy.js');
+  window.__worker = [];
+  await loadScript('../extension/shared/omdb.js');
+  await loadScript('../extension/shared/cache_policy.js');
   await loadScript('../extension/background/service_worker.js');
   await loadScript('../extension/ui/badge.js');
   await loadScript('../extension/content_scripts/main.js');
@@ -97,12 +107,13 @@ async function run(simulateQuota) {
   // Requests are sequential (~500ms apart), so the queue has drained once the count stops moving
   for (let last = -1, stableFor = 0; stableFor < 4000; ) {
     await new Promise(r => setTimeout(r, 500));
-    if (window.__omdbCalls === last) stableFor += 500; else { last = window.__omdbCalls; stableFor = 0; }
+    const n = window.__omdbCalls + window.__worker.length;
+    if (n === last) stableFor += 500; else { last = n; stableFor = 0; }
   }
   const badges = [...document.querySelectorAll('.card')].map(c => ({ title: c.dataset.title, badge: c.querySelector('.sr-badge')?.textContent, note: c.querySelector('.sr-badge')?.title || '' }));
   const cached = Object.entries(store.read()).filter(([k]) => k.startsWith('sr_cache_'))
     .map(([k, v]) => ({ key: k.slice(9), found: v.data.found, rating: v.data.imdbRating, released: v.data.released, refreshDays: StreamRatingsCachePolicy.ttlDays(v.data), ageMin: Math.round((Date.now() - v.ts) / 60000) }));
-  window.__report = { omdbCalls: window.__omdbCalls, visible: badges.slice(0, VISIBLE.length), offscreenLoaded: badges.slice(VISIBLE.length).filter(b => b.badge !== '…').length, cached };
+  window.__report = { omdbCalls: window.__omdbCalls, sharedCache: window.__worker.slice(), visible: badges.slice(0, VISIBLE.length), offscreenLoaded: badges.slice(VISIBLE.length).filter(b => b.badge !== '…').length, cached };
   document.getElementById('log').textContent = JSON.stringify(window.__report, null, 2);
   return window.__report;
 }

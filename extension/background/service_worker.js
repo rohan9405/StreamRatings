@@ -9,7 +9,7 @@
 
 importScripts('../shared/omdb.js', '../shared/cache_policy.js');
 
-const SHARED_CACHE_URL = "https://streamratings-cache.workers.dev";
+const SHARED_CACHE_URL = "https://streamratings-cache.rohan-trades-trump.workers.dev";
 const CONFIG_KEY = "sr_config";
 
 chrome.runtime.onInstalled.addListener(async (details) => {
