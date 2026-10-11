@@ -22,7 +22,7 @@ Setup takes a minute: after installing, get a free key from OMDb (the open movie
 Ratings come from OMDb. StreamRatings is not affiliated with IMDb, Netflix, Amazon or JioHotstar.
 
 - **Icon:** extension/icons/icon128.png
-- **Screenshots (1280×800):** store-assets/screenshot-*.png
+- **Screenshot:** store-assets/screenshot-1-jiohotstar-1280x800.png (640×400 version also included)
 
 ## Privacy practices tab
 - **Single purpose:** Show IMDb ratings on title cards on Netflix, Prime Video and JioHotstar.
