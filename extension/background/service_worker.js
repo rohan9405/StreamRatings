@@ -69,12 +69,13 @@ async function omdbGet(apiKey, params) {
   url.searchParams.append("apikey", apiKey);
   for (const [k, v] of Object.entries(params)) url.searchParams.append(k, v);
   const res = await fetch(url.toString());
-  if (res.status === 401) throw new Error("Invalid OMDb API key");
-  if (!res.ok) throw new Error(`OMDb HTTP ${res.status}`);
-  const data = await res.json();
-  if (data.Response === "False" && /api key|limit reached/i.test(data.Error || "")) {
+  // OMDb answers 401 for both a bad key and "Request limit reached!" - read the body to tell them apart
+  const data = await res.json().catch(() => null);
+  if (data && data.Response === "False" && /api key|limit reached/i.test(data.Error || "")) {
     throw new Error(`OMDb: ${data.Error}`);
   }
+  if (res.status === 401) throw new Error("Invalid OMDb API key");
+  if (!res.ok || !data) throw new Error(`OMDb HTTP ${res.status}`);
   return data;
 }
 

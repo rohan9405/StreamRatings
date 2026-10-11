@@ -2,15 +2,19 @@ const HotstarAdapter = {
   domain: 'hotstar.com',
 
   findCards() {
-    // Hotstar selectors - often change, best effort
-    return document.querySelectorAll('.tray-container a, .shimmer-container a, .LDS-Card');
+    // Poster tiles: <div data-testid="action" aria-label="Kanguva,Movie">.
+    // Only movies and shows - episode clips and editorial banners have no IMDb entry.
+    return document.querySelectorAll(
+      '[data-testid="action"][aria-label$=",Movie"], [data-testid="action"][aria-label$=",Show"]'
+    );
   },
 
   extractTitle(card) {
-    // Aria label usually has "Watch <Title>"
+    // "I, Nobody,Movie" -> "I, Nobody" (strip only the trailing type)
     const aria = card.getAttribute('aria-label');
     if (aria) {
-      return aria.replace(/^Watch\s+/i, '');
+      const title = aria.replace(/,\s*(Movie|Show)$/i, '').trim();
+      if (title) return title;
     }
 
     // Image alt

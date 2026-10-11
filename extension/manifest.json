@@ -10,6 +10,8 @@
     "https://*.netflix.com/*",
     "https://*.primevideo.com/*",
     "https://*.hotstar.com/*",
+    "https://*.jiohotstar.com/*",
+    "https://www.omdbapi.com/*",
     "<all_urls>"
   ],
   "options_page": "options/options.html",
@@ -18,7 +20,8 @@
       "matches": [
         "https://*.netflix.com/*",
         "https://*.primevideo.com/*",
-        "https://*.hotstar.com/*"
+        "https://*.hotstar.com/*",
+        "https://*.jiohotstar.com/*"
       ],
       "js": [
         "content_scripts/main.js",
@@ -27,7 +30,9 @@
         "adapters/hotstar.js",
         "ui/badge.js"
       ],
-      "css": ["ui/badge.css"]
+      "css": [
+        "ui/badge.css"
+      ]
     }
   ],
   "background": {

@@ -65,7 +65,8 @@ If you'd rather keep the OMDb key off the browser, run the included Express serv
 
 - **Frontend (Extension)**: Scans page for title cards, injects badges, fetches ratings
 - **Backend (Replit)**: Receives requests with your secret key, calls OMDb API securely, caches results for 24 hours
-- **Caching**: Extension caches ratings locally (7 days), backend caches for 24 hours → very fast & cheap
+- **Caching**: Every lookup result (found or not) is cached in the extension for 5 days; errors are never cached. The backend also caches for 24 hours
+- **Quota-friendly**: OMDb's free tier allows 1,000 requests/day, so ratings load only for cards you scroll into view, and lookups pause for the page once OMDb reports the daily limit
 - **Rate Limiting**: Max 60 requests per IP per minute
 - **Security**: Your OMDb API key is stored ONLY on the Replit backend, never sent to the extension or browser
 
