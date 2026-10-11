@@ -24,6 +24,7 @@
         "https://*.jiohotstar.com/*"
       ],
       "js": [
+        "content_scripts/cache_policy.js",
         "content_scripts/main.js",
         "adapters/netflix.js",
         "adapters/prime.js",

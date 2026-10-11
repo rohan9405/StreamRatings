@@ -103,6 +103,8 @@ async function fetchFromOmdb(title, year, apiKey) {
     title: found ? matchedData.Title : null,
     year: found ? matchedData.Year : null,
     genre: found ? matchedData.Genre : null,
+    released: found ? matchedData.Released : null,
+    type: found ? matchedData.Type : null,
     imdbRating: found ? matchedData.imdbRating : null,
     imdbVotes: found ? matchedData.imdbVotes : null,
     imdbID: found ? matchedData.imdbID : null,

@@ -65,7 +65,17 @@ If you'd rather keep the OMDb key off the browser, run the included Express serv
 
 - **Frontend (Extension)**: Scans page for title cards, injects badges, fetches ratings
 - **Backend (Replit)**: Receives requests with your secret key, calls OMDb API securely, caches results for 24 hours
-- **Caching**: Every lookup result (found or not) is cached in the extension for 5 days; errors are never cached. The backend also caches for 24 hours
+- **Caching**: Ratings are always served from the extension's cache first. A title is only re-fetched once its cache entry is due, based on release date:
+
+  | Released | Refreshed every |
+  |---|---|
+  | Last 3 months (incl. current month) or upcoming | 3 days |
+  | 3–12 months ago (and series still airing) | 5 days |
+  | 1–5 years ago | 15 days |
+  | More than 5 years ago | 30 days |
+  | Not found on OMDb | retried after 5 days |
+
+  If a refresh fails (network, daily limit), the previous rating keeps showing. Errors are never cached. Rules live in `extension/content_scripts/cache_policy.js`. The optional backend also caches for 24 hours
 - **Quota-friendly**: OMDb's free tier allows 1,000 requests/day, so ratings load only for cards you scroll into view, and lookups pause for the page once OMDb reports the daily limit
 - **Rate Limiting**: Max 60 requests per IP per minute
 - **Security**: Your OMDb API key is stored ONLY on the Replit backend, never sent to the extension or browser

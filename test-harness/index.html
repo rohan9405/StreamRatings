@@ -82,6 +82,7 @@ function loadScript(src) { return new Promise((res, rej) => { const s = document
 async function run(simulateQuota) {
   window.__simulateQuota = simulateQuota;
   window.__omdbCalls = 0;
+  await loadScript('../extension/content_scripts/cache_policy.js');
   await loadScript('../extension/background/service_worker.js');
   await loadScript('../extension/ui/badge.js');
   await loadScript('../extension/content_scripts/main.js');
@@ -89,7 +90,7 @@ async function run(simulateQuota) {
   await new Promise(r => setTimeout(r, 2000 + VISIBLE.length * 3 * 800 + 1500));
   const badges = [...document.querySelectorAll('.card')].map(c => ({ title: c.dataset.title, badge: c.querySelector('.sr-badge')?.textContent, note: c.querySelector('.sr-badge')?.title || '' }));
   const cached = Object.entries(store.read()).filter(([k]) => k.startsWith('sr_cache_'))
-    .map(([k, v]) => ({ key: k.slice(9), found: v.data.found, rating: v.data.imdbRating, ageMin: Math.round((Date.now() - v.ts) / 60000) }));
+    .map(([k, v]) => ({ key: k.slice(9), found: v.data.found, rating: v.data.imdbRating, released: v.data.released, refreshDays: StreamRatingsCachePolicy.ttlDays(v.data), ageMin: Math.round((Date.now() - v.ts) / 60000) }));
   window.__report = { omdbCalls: window.__omdbCalls, visible: badges.slice(0, VISIBLE.length), offscreenLoaded: badges.slice(VISIBLE.length).filter(b => b.badge !== '…').length, cached };
   document.getElementById('log').textContent = JSON.stringify(window.__report, null, 2);
   return window.__report;

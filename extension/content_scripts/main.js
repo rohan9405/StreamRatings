@@ -2,9 +2,10 @@
   console.log("[SR] Content script loaded");
   const STORAGE_KEY_PREFIX = "sr_cache_";
   const CONFIG_KEY = "sr_config";
-  // Every result (found or not) is reused for 5 days before OMDb is asked again.
+  // Cached results are always served first; OMDb is only asked again once the
+  // entry is stale per the release-date tiers in cache_policy.js (3/5/15/30 days).
   // OMDb's free tier is 1,000 requests/day, so lookups must be rare.
-  const CACHE_TTL = 5 * 24 * 60 * 60 * 1000; // 5 days
+  const CachePolicy = window.StreamRatingsCachePolicy;
 
   let config = {
     omdbApiKey: "",
@@ -49,10 +50,12 @@
   function processQueue() {
     if (activeRequests >= MAX_CONCURRENT || requestQueue.length === 0) return;
 
-    const { key, title, year, resolve, reject } = requestQueue.shift();
+    const { key, title, year, stale, resolve, reject } = requestQueue.shift();
 
     if (quotaExhausted) {
-      reject(new Error("Daily OMDb limit reached - cached ratings only"));
+      // Keep showing the old rating rather than nothing
+      if (stale) resolve(stale.data);
+      else reject(new Error("Daily OMDb limit reached - cached ratings only"));
       processQueue();
       return;
     }
@@ -75,7 +78,9 @@
             quotaExhausted = true;
             console.warn("[SR] ⛔ OMDb daily limit reached - pausing lookups");
           }
-          reject(err);
+          // Refresh failed: fall back to the stale cached rating if we have one
+          if (stale) resolve(stale.data);
+          else reject(err);
         })
         .finally(() => {
           activeRequests--;
@@ -93,22 +98,27 @@
     }
 
     const promise = new Promise(async (resolve, reject) => {
-      // 2. Check Local Storage
+      // 2. Check Local Storage - serve from cache unless the entry needs a refresh
+      let stale = null;
       try {
         const cacheKey = STORAGE_KEY_PREFIX + key;
         const result = await chrome.storage.local.get(cacheKey);
         const cached = result[cacheKey];
 
-        if (cached && cached.data && (Date.now() - cached.ts < CACHE_TTL)) {
-          resolve(cached.data);
-          return;
+        if (cached && cached.data) {
+          if (CachePolicy.isFresh(cached)) {
+            resolve(cached.data);
+            return;
+          }
+          stale = cached;
+          console.log(`[SR] ♻️ Refreshing "${title}" (cached ${Math.round((Date.now() - cached.ts) / CachePolicy.DAY)}d ago, refresh every ${CachePolicy.ttlDays(cached.data)}d)`);
         }
       } catch (e) {
         console.warn("Cache read failed", e);
       }
 
       // 3. Enqueue Network Request
-      requestQueue.push({ key, title, year, resolve, reject });
+      requestQueue.push({ key, title, year, stale, resolve, reject });
       processQueue();
     });
 
