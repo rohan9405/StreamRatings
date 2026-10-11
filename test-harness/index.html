@@ -11,7 +11,7 @@ pre{background:#222;padding:10px;white-space:pre-wrap}
 <link rel="stylesheet" href="../extension/ui/badge.css">
 </head><body>
 <h1>StreamRatings end-to-end test</h1>
-<p>1. Paste your OMDb key and Save (kept only in this page's storage). 2. Click Run. Only the 6 on-screen cards should hit OMDb; reload + Run again should make 0 requests.</p>
+<p>The OMDb key is loaded from <code>OMDB_API_KEY</code> / <code>.env</code> automatically (or paste one below). Click Run. Only the 6 on-screen cards should hit OMDb; reload + Run again should make 0 requests.</p>
 <input id="key" type="password" placeholder="OMDb API key"> <button id="save">Save key</button> <span id="keystatus"></span>
 <p><button id="run">Run</button><button id="runQuota">Run with simulated quota limit</button><button id="clear">Clear cache</button></p>
 <pre id="log">idle</pre>
@@ -32,6 +32,11 @@ const store = {
 };
 const keyStatus = () => { document.getElementById('keystatus').textContent = store.read().sr_config ? 'key saved ✓' : 'no key'; };
 keyStatus();
+// Pick up OMDB_API_KEY from the env / .env via the local test server, so it never has to be typed in
+window.__configReady = fetch('/harness-config.json').then(r => r.ok ? r.json() : {}).then(c => {
+  if (c.omdbApiKey) { const s = store.read(); s.sr_config = { omdbApiKey: c.omdbApiKey }; store.write(s); }
+  keyStatus();
+}).catch(() => {});
 document.getElementById('save').onclick = () => {
   const s = store.read(); s.sr_config = { omdbApiKey: document.getElementById('key').value.trim() }; store.write(s);
   document.getElementById('key').value = ''; keyStatus();
@@ -80,14 +85,20 @@ window.StreamRatingsAdapter = {
 function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src + '?t=' + Date.now(); s.onload = res; s.onerror = rej; document.body.appendChild(s); }); }
 
 async function run(simulateQuota) {
+  await window.__configReady;
   window.__simulateQuota = simulateQuota;
   window.__omdbCalls = 0;
   await loadScript('../extension/content_scripts/cache_policy.js');
   await loadScript('../extension/background/service_worker.js');
   await loadScript('../extension/ui/badge.js');
   await loadScript('../extension/content_scripts/main.js');
-  // main.js scans after 2s, then requests go out sequentially every ~500ms
-  await new Promise(r => setTimeout(r, 2000 + VISIBLE.length * 3 * 800 + 1500));
+  // main.js scans after 2s; then wait until every badge that started loading has settled
+  await new Promise(r => setTimeout(r, 3000));
+  // Requests are sequential (~500ms apart), so the queue has drained once the count stops moving
+  for (let last = -1, stableFor = 0; stableFor < 4000; ) {
+    await new Promise(r => setTimeout(r, 500));
+    if (window.__omdbCalls === last) stableFor += 500; else { last = window.__omdbCalls; stableFor = 0; }
+  }
   const badges = [...document.querySelectorAll('.card')].map(c => ({ title: c.dataset.title, badge: c.querySelector('.sr-badge')?.textContent, note: c.querySelector('.sr-badge')?.title || '' }));
   const cached = Object.entries(store.read()).filter(([k]) => k.startsWith('sr_cache_'))
     .map(([k, v]) => ({ key: k.slice(9), found: v.data.found, rating: v.data.imdbRating, released: v.data.released, refreshDays: StreamRatingsCachePolicy.ttlDays(v.data), ageMin: Math.round((Date.now() - v.ts) / 60000) }));
