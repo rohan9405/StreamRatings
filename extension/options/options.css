@@ -113,3 +113,20 @@ button:hover {
   font-size: 14px;
   min-height: 20px;
 }
+
+.intro {
+  color: #3f3f46;
+  margin: -12px 0 16px;
+  line-height: 1.5;
+}
+
+.steps {
+  padding-left: 20px;
+  margin: 0 0 24px;
+  line-height: 1.7;
+  color: #3f3f46;
+}
+
+.steps a {
+  color: #2563eb;
+}

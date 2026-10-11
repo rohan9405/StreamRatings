@@ -1,4 +1,4 @@
-// Cache refresh policy: how long a cached rating stays fresh depends on how
+// Cache refresh policy (shared by the extension and the shared-cache server): how long a cached rating stays fresh depends on how
 // recently the title was released (newer titles' ratings move faster).
 //
 //   released in the last 3 months (incl. current month) ->  3 days
@@ -63,4 +63,4 @@ const CachePolicy = {
   }
 };
 
-window.StreamRatingsCachePolicy = CachePolicy;
+globalThis.StreamRatingsCachePolicy = CachePolicy;

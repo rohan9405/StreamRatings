@@ -7,49 +7,36 @@
   // OMDb's free tier is 1,000 requests/day, so lookups must be rare.
   const CachePolicy = window.StreamRatingsCachePolicy;
 
-  let config = {
-    omdbApiKey: "",
-    backendUrl: "",
-    secret: ""
-  };
-
-  // Load config from local storage (content scripts can't access sync)
-  try {
-    const result = await chrome.storage.local.get(CONFIG_KEY);
-    if (result[CONFIG_KEY]) {
-      config = result[CONFIG_KEY];
-      console.log("[SR] ✅ Config loaded:", {
-        hasOmdbApiKey: !!config.omdbApiKey,
-        backendUrl: config.backendUrl,
-        hasSecret: !!config.secret
-      });
-    } else {
-      console.warn("[SR] ❌ No config in storage");
-    }
-  } catch (e) {
-    console.error("[SR] Config load failed:", e);
-  }
-
-  if (!config.omdbApiKey && !config.backendUrl) {
+  // The OMDb key lives in extension storage and is only used by the service worker;
+  // here we just check that setup is done. Re-check when the user saves Options.
+  async function hasKey() {
     try {
-      const res = await fetch(chrome.runtime.getURL("config.local.json"));
-      if (res.ok) {
-        const local = await res.json();
-        if (local.omdbApiKey) {
-          config.omdbApiKey = local.omdbApiKey;
-          console.log("[SR] ✅ Using OMDb key from config.local.json (.env)");
-        }
-      }
+      const { [CONFIG_KEY]: config = {} } = await chrome.storage.local.get(CONFIG_KEY);
+      return !!config.omdbApiKey;
     } catch (e) {
-      // No bundled config - Options page is the only source
+      console.error("[SR] Config load failed:", e);
+      return false;
     }
   }
 
-  if (!config.omdbApiKey && (!config.backendUrl || !config.secret)) {
-    console.log("[SR] ❌ Missing config - open extension Options to configure");
-    return;
+  if (!(await hasKey())) {
+    // Service worker may still be importing a dev key from .env - give it a moment
+    await new Promise(r => setTimeout(r, 1500));
+    if (!(await hasKey())) {
+      console.log("[SR] ❌ No OMDb key - open StreamRatings Options to add your free key");
+      // Start as soon as a key is saved, without needing a page reload
+      await new Promise(resolve => {
+        chrome.storage.onChanged.addListener(function onChange(changes) {
+          const next = changes[CONFIG_KEY] && changes[CONFIG_KEY].newValue;
+          if (next && next.omdbApiKey) {
+            chrome.storage.onChanged.removeListener(onChange);
+            resolve();
+          }
+        });
+      });
+    }
   }
-  console.log("[SR] ✅ Config valid, starting scan...");
+  console.log("[SR] ✅ Ready, starting scan...");
 
   // --- De-duplication & Concurrency ---
   const inFlightRequests = new Map(); // key -> Promise
@@ -80,11 +67,13 @@
     // Add small delay before fetching to smooth out request load
     setTimeout(() => {
       fetchRating(title, year)
-        .then(data => {
+        .then(({ data, ts }) => {
           // Cache found AND not-found results so misses don't burn quota on every visit.
+          // ts is when the rating was fetched from OMDb (possibly by another user via the
+          // shared cache), so the local copy expires on the same schedule.
           // Errors (network, bad key, quota) reject and are never cached.
           chrome.storage.local.set({
-            [STORAGE_KEY_PREFIX + key]: { data, ts: Date.now() }
+            [STORAGE_KEY_PREFIX + key]: { data, ts: ts || Date.now() }
           });
           resolve(data);
         })
@@ -105,7 +94,7 @@
   }
 
   function getRating(title, year) {
-    const key = `${title.toLowerCase().trim()}:${year || ''}`;
+    const key = StreamRatingsOmdb.cacheKey(title, year);
 
     // 1. Check Memory/In-Flight
     if (inFlightRequests.has(key)) {
@@ -154,15 +143,14 @@
       chrome.runtime.sendMessage({
         action: 'fetchRating',
         title,
-        year,
-        config
+        year
       }, (response) => {
         if (chrome.runtime.lastError) {
           console.error(`[SR] Service worker error for "${title}":`, chrome.runtime.lastError.message);
           reject(new Error(chrome.runtime.lastError.message));
         } else if (response && response.success) {
           console.log(`[SR] ✅ Got rating for "${title}":`, response.data.imdbRating || "N/A");
-          resolve(response.data);
+          resolve({ data: response.data, ts: response.ts });
         } else if (response) {
           console.error(`[SR] Service worker failed for "${title}":`, response.error);
           reject(new Error(response.error));

@@ -7,36 +7,40 @@ document.getElementById('clearCache').addEventListener('click', clearCache);
 
 function saveOptions() {
   const omdbApiKey = document.getElementById('omdbApiKey').value.trim();
-  const backendUrl = document.getElementById('backendUrl').value.trim();
-  const secret = document.getElementById('secret').value.trim();
   const status = document.getElementById('status');
+  const button = document.getElementById('save');
 
-  if (!omdbApiKey && (!backendUrl || !secret)) {
-    status.textContent = 'Enter an OMDb API key, or both a Backend URL and Secret.';
+  if (!/^[a-z0-9]{6,12}$/i.test(omdbApiKey)) {
+    status.textContent = 'That doesn\'t look like an OMDb key (8 letters/numbers, from the OMDb email).';
     status.className = 'error';
     return;
   }
 
-  // Save to local storage (content scripts can access local, not sync)
-  chrome.storage.local.set({
-    [CONFIG_KEY]: { omdbApiKey, backendUrl, secret }
-  }, () => {
-    status.textContent = 'Options saved successfully!';
-    status.className = 'success';
-    console.log("StreamRatings config saved:", { hasOmdbApiKey: !!omdbApiKey, backendUrl, hasSecret: !!secret });
-    setTimeout(() => {
-      status.textContent = '';
-    }, 2000);
+  // Check the key with one real lookup before saving
+  button.disabled = true;
+  status.textContent = 'Checking key…';
+  status.className = 'info';
+  chrome.runtime.sendMessage({ action: 'testKey', apiKey: omdbApiKey }, (response) => {
+    button.disabled = false;
+    if (!response || !response.success) {
+      const error = response ? response.error : 'No response';
+      status.textContent = /api key|invalid/i.test(error)
+        ? 'OMDb rejected this key. Did you click the activation link in the OMDb email?'
+        : `Couldn't check the key: ${error}`;
+      status.className = 'error';
+      return;
+    }
+    chrome.storage.local.set({ [CONFIG_KEY]: { omdbApiKey } }, () => {
+      status.textContent = 'Saved! Open Netflix, Prime Video or JioHotstar to see ratings.';
+      status.className = 'success';
+    });
   });
 }
 
 function restoreOptions() {
   chrome.storage.local.get(CONFIG_KEY, (items) => {
-    if (items[CONFIG_KEY]) {
-      document.getElementById('omdbApiKey').value = items[CONFIG_KEY].omdbApiKey || '';
-      document.getElementById('backendUrl').value = items[CONFIG_KEY].backendUrl || '';
-      document.getElementById('secret').value = items[CONFIG_KEY].secret || '';
-      console.log("StreamRatings config restored");
+    if (items[CONFIG_KEY] && items[CONFIG_KEY].omdbApiKey) {
+      document.getElementById('omdbApiKey').value = items[CONFIG_KEY].omdbApiKey;
     }
   });
   updateCacheStats();
@@ -71,7 +75,7 @@ function updateCacheStats() {
     const cacheKeys = Object.keys(items).filter(key => key.startsWith(STORAGE_KEY_PREFIX));
     const cacheInfo = document.querySelector('.cache-info');
     if (cacheInfo) {
-      cacheInfo.textContent = `Currently ${cacheKeys.length} titles cached. Clear to force fresh lookups.`;
+      cacheInfo.textContent = `${cacheKeys.length} titles cached in this browser. Ratings refresh every 3–30 days depending on how recent the title is.`;
     }
   });
 }

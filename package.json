@@ -9,6 +9,7 @@
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "ext:env": "sh script/extension-env.sh",
+    "ext:package": "sh script/package-extension.sh",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

@@ -1,153 +1,113 @@
 // Service Worker for StreamRatings
-// Handles API calls from content scripts with proper extension privileges.
-// Two modes:
-//   - Direct: calls OMDb with the user's own API key (no backend needed)
-//   - Backend: proxies through a self-hosted StreamRatings server
+// Handles rating lookups for content scripts. The user's OMDb key never leaves
+// the extension except to OMDb itself or the StreamRatings shared cache.
+//
+// Lookup order (the content script has already checked the local cache):
+//   1. Shared cache (Cloudflare Worker): serves ratings fetched by any user; on a
+//      miss it fetches from OMDb with this user's key and stores the result.
+//   2. If the shared cache is unreachable: OMDb directly with the user's key.
 
-const OMDB_API_URL = "https://www.omdbapi.com/";
+importScripts('../shared/omdb.js', '../shared/cache_policy.js');
 
-chrome.runtime.onInstalled.addListener(() => {
+const SHARED_CACHE_URL = "https://streamratings-cache.workers.dev";
+const CONFIG_KEY = "sr_config";
+
+chrome.runtime.onInstalled.addListener(async (details) => {
   console.log("StreamRatings installed.");
+  const key = await loadBundledKey();
+  // First install without a key: open the one-step setup page
+  if (details.reason === "install" && !key) {
+    chrome.runtime.openOptionsPage();
+  }
 });
 
-// Listen for messages from content scripts
+// Toolbar icon opens settings
+chrome.action.onClicked.addListener(() => chrome.runtime.openOptionsPage());
+
+// Development convenience: `npm run ext:env` writes config.local.json from .env.
+// Store builds never include it.
+async function loadBundledKey() {
+  const { [CONFIG_KEY]: config = {} } = await chrome.storage.local.get(CONFIG_KEY);
+  if (config.omdbApiKey) return config.omdbApiKey;
+  try {
+    const res = await fetch(chrome.runtime.getURL("config.local.json"));
+    if (!res.ok) return null;
+    const local = await res.json();
+    if (!local.omdbApiKey) return null;
+    await chrome.storage.local.set({ [CONFIG_KEY]: { ...config, omdbApiKey: local.omdbApiKey } });
+    console.log("[SR-SW] Using OMDb key from config.local.json (.env)");
+    return local.omdbApiKey;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function getApiKey() {
+  const { [CONFIG_KEY]: config = {} } = await chrome.storage.local.get(CONFIG_KEY);
+  return config.omdbApiKey || loadBundledKey();
+}
+
+// Listen for messages from content scripts and the options page
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log("[SR-SW] Message received:", request.action);
   if (request.action === "fetchRating") {
-    handleFetchRating(request.title, request.year, request.config || {})
-      .then(data => {
-        console.log("[SR-SW] ✅ Success for", request.title);
-        sendResponse({ success: true, data });
-      })
+    handleFetchRating(request.title, request.year)
+      .then(result => sendResponse({ success: true, ...result }))
       .catch(error => {
         console.error("[SR-SW] ❌ Error for", request.title, ":", error.message);
         sendResponse({ success: false, error: error.message });
       });
     return true; // Keep channel open for async response
   }
+  if (request.action === "testKey") {
+    testKey(request.apiKey)
+      .then(() => sendResponse({ success: true }))
+      .catch(error => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
 });
 
-async function handleFetchRating(title, year, config) {
-  if (config.omdbApiKey) {
-    return fetchFromOmdb(title, year, config.omdbApiKey);
+// Returns { data, ts } where ts is when the rating was fetched from OMDb
+async function handleFetchRating(title, year) {
+  const apiKey = await getApiKey();
+  if (!apiKey) throw new Error("Add your free OMDb key in StreamRatings Options");
+
+  try {
+    return await fetchFromSharedCache(title, year, apiKey);
+  } catch (err) {
+    if (!err.sharedCacheDown) throw err;
+    console.warn("[SR-SW] Shared cache unavailable, asking OMDb directly:", err.message);
   }
-  if (config.backendUrl && config.secret) {
-    return fetchFromBackend(title, year, config.backendUrl, config.secret);
-  }
-  throw new Error("Not configured - open StreamRatings Options");
+
+  const data = await StreamRatingsOmdb.lookup(title, year, apiKey);
+  return { data, ts: Date.now() };
 }
 
-async function fetchFromBackend(title, year, backendUrl, secret) {
-  const baseUrl = backendUrl.replace(/\/$/, '');
-  const url = new URL(`${baseUrl}/api/omdb`);
+async function fetchFromSharedCache(title, year, apiKey) {
+  const url = new URL(`${SHARED_CACHE_URL}/v1/rating`);
   url.searchParams.append('title', title);
   if (year) url.searchParams.append('year', year);
 
-  console.log(`[SR-SW] Fetching: "${title}" from ${baseUrl}`);
-
-  const res = await fetch(url.toString(), {
-    headers: {
-      'x-streamratings-secret': secret
-    }
-  });
-
-  if (!res.ok) {
-    if (res.status === 401) throw new Error("Unauthorized - check your secret");
-    if (res.status === 404) throw new Error("Backend not found (HTTP 404) - is your server still deployed?");
-    throw new Error(`HTTP ${res.status}`);
+  let res;
+  try {
+    res = await fetch(url.toString(), { headers: { 'X-OMDb-Key': apiKey } });
+  } catch (e) {
+    throw Object.assign(new Error(e.message), { sharedCacheDown: true });
   }
 
-  const data = await res.json();
-  console.log(`[SR-SW] Got rating: ${data.imdbRating}`);
-  return data;
+  const body = await res.json().catch(() => null);
+  if (res.ok && body && body.data) {
+    console.log(`[SR-SW] ${body.cache === 'hit' ? 'Shared cache hit' : 'Fetched + shared'}: "${title}"`);
+    return { data: body.data, ts: body.ts };
+  }
+  // 4xx from the cache means OMDb rejected this user's key or hit its limit - pass that on
+  if (res.status >= 400 && res.status < 500 && body && body.error) {
+    throw new Error(body.error);
+  }
+  throw Object.assign(new Error(`Shared cache HTTP ${res.status}`), { sharedCacheDown: true });
 }
 
-// --- Direct OMDb mode (mirrors server/routes.ts) ---
-
-async function omdbGet(apiKey, params) {
-  const url = new URL(OMDB_API_URL);
-  url.searchParams.append("apikey", apiKey);
-  for (const [k, v] of Object.entries(params)) url.searchParams.append(k, v);
-  const res = await fetch(url.toString());
-  // OMDb answers 401 for both a bad key and "Request limit reached!" - read the body to tell them apart
-  const data = await res.json().catch(() => null);
-  if (data && data.Response === "False" && /api key|limit reached/i.test(data.Error || "")) {
-    throw new Error(`OMDb: ${data.Error}`);
-  }
-  if (res.status === 401) throw new Error("Invalid OMDb API key");
-  if (!res.ok || !data) throw new Error(`OMDb HTTP ${res.status}`);
-  return data;
-}
-
-async function fetchFromOmdb(title, year, apiKey) {
-  console.log(`[SR-SW] Fetching: "${title}" from OMDb directly`);
-
-  let matchedData = await omdbGet(apiKey, year ? { t: title, y: year } : { t: title });
-  let found = matchedData.Response === "True";
-
-  // If exact match failed, try search API for fuzzy matching
-  if (!found) {
-    const searchData = await omdbGet(apiKey, { s: title });
-    if (searchData.Response === "True" && searchData.Search && searchData.Search.length > 0) {
-      const bestMatch = findBestMatch(title, searchData.Search);
-      if (bestMatch) {
-        matchedData = await omdbGet(apiKey, { i: bestMatch.imdbID });
-        found = matchedData.Response === "True";
-      }
-    }
-  }
-
-  return {
-    query: { title, year },
-    found,
-    title: found ? matchedData.Title : null,
-    year: found ? matchedData.Year : null,
-    genre: found ? matchedData.Genre : null,
-    released: found ? matchedData.Released : null,
-    type: found ? matchedData.Type : null,
-    imdbRating: found ? matchedData.imdbRating : null,
-    imdbVotes: found ? matchedData.imdbVotes : null,
-    imdbID: found ? matchedData.imdbID : null,
-    source: "omdb"
-  };
-}
-
-// Simple fuzzy matching: Levenshtein distance
-function levenshteinDistance(str1, str2) {
-  const track = Array(str2.length + 1).fill(null).map(() =>
-    Array(str1.length + 1).fill(null)
-  );
-  for (let i = 0; i <= str1.length; i += 1) track[0][i] = i;
-  for (let j = 0; j <= str2.length; j += 1) track[j][0] = j;
-  for (let j = 1; j <= str2.length; j += 1) {
-    for (let i = 1; i <= str1.length; i += 1) {
-      const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
-      track[j][i] = Math.min(
-        track[j][i - 1] + 1,
-        track[j - 1][i] + 1,
-        track[j - 1][i - 1] + indicator
-      );
-    }
-  }
-  return track[str2.length][str1.length];
-}
-
-// Find best match from search results (same thresholds as the backend)
-function findBestMatch(query, results) {
-  if (!results || results.length === 0) return null;
-  const q = query.toLowerCase();
-
-  let bestMatch = results[0];
-  let bestScore = levenshteinDistance(q, results[0].Title.toLowerCase());
-  for (let i = 1; i < results.length && i < 5; i++) {
-    const distance = levenshteinDistance(q, results[i].Title.toLowerCase());
-    if (distance < bestScore) {
-      bestScore = distance;
-      bestMatch = results[i];
-    }
-  }
-
-  const actualSimilarity = (query.length - bestScore) / query.length;
-  const maxAllowedDistance = query.length < 5 ? 1 : Math.floor(query.length * 0.4);
-  return actualSimilarity >= 0.5 && bestScore <= maxAllowedDistance ? bestMatch : null;
+// Options page "Save" check: one lookup straight to OMDb
+async function testKey(apiKey) {
+  const data = await StreamRatingsOmdb.lookup("Inception", "2010", apiKey);
+  if (!data.found) throw new Error("Key works but test lookup failed");
 }

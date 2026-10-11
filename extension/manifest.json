@@ -1,20 +1,33 @@
 {
   "manifest_version": 3,
-  "name": "StreamRatings",
-  "version": "1.0",
-  "description": "Overlays IMDb ratings on Netflix, Prime Video, and Hotstar.",
+  "name": "StreamRatings – IMDb ratings on Netflix, Prime Video & JioHotstar",
+  "short_name": "StreamRatings",
+  "version": "1.1.0",
+  "description": "See IMDb ratings on every title card on Netflix, Prime Video and JioHotstar. Free, uses your own OMDb key.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "StreamRatings settings",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
   "permissions": [
     "storage"
   ],
   "host_permissions": [
-    "https://*.netflix.com/*",
-    "https://*.primevideo.com/*",
-    "https://*.hotstar.com/*",
-    "https://*.jiohotstar.com/*",
     "https://www.omdbapi.com/*",
-    "<all_urls>"
+    "https://streamratings-cache.workers.dev/*"
   ],
-  "options_page": "options/options.html",
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
   "content_scripts": [
     {
       "matches": [
@@ -24,7 +37,8 @@
         "https://*.jiohotstar.com/*"
       ],
       "js": [
-        "content_scripts/cache_policy.js",
+        "shared/omdb.js",
+        "shared/cache_policy.js",
         "content_scripts/main.js",
         "adapters/netflix.js",
         "adapters/prime.js",
@@ -38,18 +52,5 @@
   ],
   "background": {
     "service_worker": "background/service_worker.js"
-  },
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "config.local.json"
-      ],
-      "matches": [
-        "https://*.netflix.com/*",
-        "https://*.primevideo.com/*",
-        "https://*.hotstar.com/*",
-        "https://*.jiohotstar.com/*"
-      ]
-    }
-  ]
+  }
 }
