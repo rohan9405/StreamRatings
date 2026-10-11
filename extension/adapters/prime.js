@@ -20,12 +20,26 @@ const PrimeAdapter = {
       '.av-packshot'
     ];
     
-    const cards = document.querySelectorAll(selectors.join(', '));
+    const selector = selectors.join(', ');
+    // Cards nest (e.g. packshot inside card) - keep only the outermost match
+    const cards = [...document.querySelectorAll(selector)]
+      .filter(card => !card.parentElement || !card.parentElement.closest(selector));
     console.log('[SR Prime] Found', cards.length, 'cards');
     return cards;
   },
 
   extractTitle(card) {
+    const raw = this.extractRawTitle(card);
+    if (!raw) return null;
+    // "Always Home - Season 1" / "The Boys: Season 4" / "Title (4K UHD)" -> series/movie name for OMDb
+    const title = raw
+      .replace(/\s*[-:–|]?\s*\(?\b(Season|Series|Staffel|Saison|Temporada)\s*\d+\)?\s*$/i, '')
+      .replace(/\s*\((4K\s*)?(UHD|HD|SD|Dubbed|Subbed|Hindi|Tamil|Telugu)[^)]*\)\s*$/i, '')
+      .trim();
+    return title || null;
+  },
+
+  extractRawTitle(card) {
     // Data attributes first (most reliable)
     if (card.getAttribute('data-card-title')) {
       return card.getAttribute('data-card-title');

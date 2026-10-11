@@ -6,23 +6,24 @@ document.getElementById('save').addEventListener('click', saveOptions);
 document.getElementById('clearCache').addEventListener('click', clearCache);
 
 function saveOptions() {
+  const omdbApiKey = document.getElementById('omdbApiKey').value.trim();
   const backendUrl = document.getElementById('backendUrl').value.trim();
   const secret = document.getElementById('secret').value.trim();
   const status = document.getElementById('status');
 
-  if (!backendUrl || !secret) {
-    status.textContent = 'Please fill in all fields.';
+  if (!omdbApiKey && (!backendUrl || !secret)) {
+    status.textContent = 'Enter an OMDb API key, or both a Backend URL and Secret.';
     status.className = 'error';
     return;
   }
 
   // Save to local storage (content scripts can access local, not sync)
   chrome.storage.local.set({
-    [CONFIG_KEY]: { backendUrl, secret }
+    [CONFIG_KEY]: { omdbApiKey, backendUrl, secret }
   }, () => {
     status.textContent = 'Options saved successfully!';
     status.className = 'success';
-    console.log("StreamRatings config saved:", { backendUrl, hasSecret: !!secret });
+    console.log("StreamRatings config saved:", { hasOmdbApiKey: !!omdbApiKey, backendUrl, hasSecret: !!secret });
     setTimeout(() => {
       status.textContent = '';
     }, 2000);
@@ -32,8 +33,9 @@ function saveOptions() {
 function restoreOptions() {
   chrome.storage.local.get(CONFIG_KEY, (items) => {
     if (items[CONFIG_KEY]) {
-      document.getElementById('backendUrl').value = items[CONFIG_KEY].backendUrl;
-      document.getElementById('secret').value = items[CONFIG_KEY].secret;
+      document.getElementById('omdbApiKey').value = items[CONFIG_KEY].omdbApiKey || '';
+      document.getElementById('backendUrl').value = items[CONFIG_KEY].backendUrl || '';
+      document.getElementById('secret').value = items[CONFIG_KEY].secret || '';
       console.log("StreamRatings config restored");
     }
   });
