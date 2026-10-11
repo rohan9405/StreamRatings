@@ -31,13 +31,18 @@
     let found = matchedData.Response === "True";
 
     if (!found) {
-      const searchData = await omdbGet(apiKey, { s: title });
-      if (searchData.Response === "True" && searchData.Search && searchData.Search.length > 0) {
+      // OMDb search needs words it indexes: "Lokah Chapter 1: Chandra" finds nothing, but
+      // "Lokah" finds "Lokah Chapter One: Chandra". Matches are always scored against the
+      // full title, so a broader query can't produce a looser match.
+      for (const query of searchQueries(title)) {
+        const searchData = await omdbGet(apiKey, { s: query });
+        if (searchData.Response !== "True" || !searchData.Search || searchData.Search.length === 0) continue;
         const bestMatch = findBestMatch(title, searchData.Search);
         if (bestMatch) {
           matchedData = await omdbGet(apiKey, { i: bestMatch.imdbID });
           found = matchedData.Response === "True";
         }
+        break;
       }
     }
 
@@ -54,6 +59,19 @@
       imdbID: found ? matchedData.imdbID : null,
       source: "omdb"
     };
+  }
+
+  // Full title, then (at most one) broader query: the first word if distinctive, else the
+  // part before a subtitle separator. Keeps a miss to 2 searches.
+  function searchQueries(title) {
+    const queries = [title];
+    const firstWord = title.split(/\s+/)[0];
+    const mainPart = title.split(/\s*(?::|\s[-–]\s)\s*/)[0];
+    const broader = firstWord.length >= 4 ? firstWord : mainPart;
+    if (broader && broader.length >= 3 && broader.toLowerCase() !== title.toLowerCase()) {
+      queries.push(broader);
+    }
+    return queries;
   }
 
   // Simple fuzzy matching: Levenshtein distance
