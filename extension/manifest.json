@@ -38,5 +38,18 @@
   ],
   "background": {
     "service_worker": "background/service_worker.js"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "config.local.json"
+      ],
+      "matches": [
+        "https://*.netflix.com/*",
+        "https://*.primevideo.com/*",
+        "https://*.hotstar.com/*",
+        "https://*.jiohotstar.com/*"
+      ]
+    }
+  ]
 }

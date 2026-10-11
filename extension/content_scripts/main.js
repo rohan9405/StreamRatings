@@ -30,6 +30,21 @@
     console.error("[SR] Config load failed:", e);
   }
 
+  if (!config.omdbApiKey && !config.backendUrl) {
+    try {
+      const res = await fetch(chrome.runtime.getURL("config.local.json"));
+      if (res.ok) {
+        const local = await res.json();
+        if (local.omdbApiKey) {
+          config.omdbApiKey = local.omdbApiKey;
+          console.log("[SR] ✅ Using OMDb key from config.local.json (.env)");
+        }
+      }
+    } catch (e) {
+      // No bundled config - Options page is the only source
+    }
+  }
+
   if (!config.omdbApiKey && (!config.backendUrl || !config.secret)) {
     console.log("[SR] ❌ Missing config - open extension Options to configure");
     return;
@@ -160,7 +175,9 @@
   }
 
   // --- Lazy loading ---
-  // Only look up titles the user actually scrolls to, not every card in every carousel.
+  // Only look up titles that are actually on screen - not cards further down the page,
+  // off the side of a carousel, or in a background tab. A card must be at least half
+  // visible; nothing outside the viewport is prefetched.
   const pendingCards = new WeakMap(); // card -> { badge, title, year }
 
   function loadRating(card) {
@@ -188,7 +205,7 @@
           visibilityObserver.unobserve(entry.target);
           loadRating(entry.target);
         });
-      }, { rootMargin: "100px" })
+      }, { rootMargin: "0px", threshold: 0.5 })
     : null;
 
   // --- Main Logic ---

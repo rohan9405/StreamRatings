@@ -30,6 +30,11 @@ When you browse movies and TV shows on Netflix, Prime Video, or Hotstar, a small
 
 That's it — no server needed. The extension calls OMDb directly.
 
+**Prefer keeping the key in `.env`?** Put `OMDB_API_KEY=...` in `.env` (git-ignored) and run
+`npm run ext:env` (or `sh script/extension-env.sh`). It writes `extension/config.local.json`
+(also git-ignored), which the extension uses whenever no key is saved in Options. Reload the
+extension in `chrome://extensions` afterwards.
+
 ### Optional: Use a Backend Instead
 
 If you'd rather keep the OMDb key off the browser, run the included Express server
@@ -76,7 +81,7 @@ If you'd rather keep the OMDb key off the browser, run the included Express serv
   | Not found on OMDb | retried after 5 days |
 
   If a refresh fails (network, daily limit), the previous rating keeps showing. Errors are never cached. Rules live in `extension/content_scripts/cache_policy.js`. The optional backend also caches for 24 hours
-- **Quota-friendly**: OMDb's free tier allows 1,000 requests/day, so ratings load only for cards you scroll into view, and lookups pause for the page once OMDb reports the daily limit
+- **Quota-friendly**: OMDb's free tier allows 1,000 requests/day, so ratings load only for cards that are at least half on screen (nothing below the fold, off the side of a carousel, or in background tabs), and lookups pause for the page once OMDb reports the daily limit
 - **Rate Limiting**: Max 60 requests per IP per minute
 - **Security**: Your OMDb API key is stored ONLY on the Replit backend, never sent to the extension or browser
 
