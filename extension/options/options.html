@@ -9,15 +9,23 @@
     <h1>StreamRatings Configuration</h1>
     
     <div class="form-group">
+      <label for="omdbApiKey">OMDb API Key</label>
+      <input type="password" id="omdbApiKey" placeholder="Your free key from omdbapi.com">
+      <div class="help">Simplest setup: the extension calls OMDb directly. Get a free key at omdbapi.com. Leave blank to use a backend instead.</div>
+    </div>
+
+    <h2>Or use a backend (optional)</h2>
+
+    <div class="form-group">
       <label for="backendUrl">Backend URL</label>
-      <input type="text" id="backendUrl" placeholder="https://your-replit-project.replit.app">
-      <div class="help">The base URL of your Replit project (found in the webview address bar).</div>
+      <input type="text" id="backendUrl" placeholder="https://your-streamratings-server.example.com">
+      <div class="help">The base URL of your self-hosted StreamRatings server. Only used if no OMDb key is set above.</div>
     </div>
 
     <div class="form-group">
       <label for="secret">StreamRatings Secret</label>
       <input type="password" id="secret" placeholder="Your secret key">
-      <div class="help">Must match STREAMRATINGS_SECRET in your Replit Secrets.</div>
+      <div class="help">Must match STREAMRATINGS_SECRET on your server.</div>
     </div>
 
     <button id="save">Save Settings</button>

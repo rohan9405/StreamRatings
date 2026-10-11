@@ -5,6 +5,7 @@
   const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 
   let config = {
+    omdbApiKey: "",
     backendUrl: "",
     secret: ""
   };
@@ -15,6 +16,7 @@
     if (result[CONFIG_KEY]) {
       config = result[CONFIG_KEY];
       console.log("[SR] ✅ Config loaded:", {
+        hasOmdbApiKey: !!config.omdbApiKey,
         backendUrl: config.backendUrl,
         hasSecret: !!config.secret
       });
@@ -25,7 +27,7 @@
     console.error("[SR] Config load failed:", e);
   }
 
-  if (!config.backendUrl || !config.secret) {
+  if (!config.omdbApiKey && (!config.backendUrl || !config.secret)) {
     console.log("[SR] ❌ Missing config - open extension Options to configure");
     return;
   }
@@ -121,8 +123,7 @@
         action: 'fetchRating',
         title,
         year,
-        backendUrl: config.backendUrl,
-        secret: config.secret
+        config
       }, (response) => {
         if (chrome.runtime.lastError) {
           console.error(`[SR] Service worker error for "${title}":`, chrome.runtime.lastError.message);

@@ -82,9 +82,12 @@ export async function registerRoutes(
     const serverSecret = process.env.STREAMRATINGS_SECRET;
     const origin = req.headers.origin || req.headers.referer || "";
     const host = req.headers.host || "";
-    
-    // Allow same-origin requests (landing page demo) without secret
-    const isSameOrigin = origin.includes(host) || origin.includes("replit");
+
+    // Allow same-origin requests (landing page demo) without secret.
+    // Compare exact hosts - substring checks let any origin containing the host bypass auth.
+    let originHost = "";
+    try { originHost = new URL(origin).host; } catch {}
+    const isSameOrigin = !!host && originHost === host;
     
     if (!isSameOrigin && (!serverSecret || clientSecret !== serverSecret)) {
       return res.status(401).json({ message: "Invalid or missing secret" });

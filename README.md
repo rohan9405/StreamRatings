@@ -9,45 +9,33 @@ When you browse movies and TV shows on Netflix, Prime Video, or Hotstar, a small
 - **On click**: Opens the IMDb page in a new tab
 - **On hover**: Shows title, year, and vote count
 
-## Quick Start (5 Steps)
+## Quick Start (3 Steps)
 
 ### Step 1: Get an OMDb API Key
 
-1. Go to [omdbapi.com](https://www.omdbapi.com/)
-2. Click "API key (free)"
-3. Enter your email and click "Get Free Key"
-4. Check your email and click the verification link
-5. Copy your API key (you'll see it on the confirmation page)
+1. Go to [omdbapi.com](https://www.omdbapi.com/apikey.aspx) and request a free key
+2. Click the verification link in your email
+3. Copy your API key
 
-### Step 2: Set Replit Secrets
-
-1. In Replit, click the **Secrets** button (lock icon) in the bottom-left
-2. Add two secrets:
-   - **Name**: `OMDB_API_KEY` → **Value**: Paste your OMDb API key
-   - **Name**: `STREAMRATINGS_SECRET` → **Value**: Create any random string (e.g., `my-secret-key-12345`)
-3. Close the Secrets dialog
-
-### Step 3: Get Your Backend URL
-
-1. In Replit, click the **Run** button to start the server (if not already running)
-2. Wait for "Server running at http://..." message
-3. Look at the webview URL in the top-right — copy this (it looks like `https://your-project-name.replit.app`)
-
-### Step 4: Load the Extension in Chrome
+### Step 2: Load the Extension in Chrome
 
 1. Open Chrome and go to `chrome://extensions`
 2. Enable **Developer mode** (toggle in the top-right)
-3. Click **Load unpacked**
-4. Navigate to your Replit project folder, select the `extension` folder, and click **Select**
-5. You should see "StreamRatings" appear in your extensions list
+3. Click **Load unpacked** and select the `extension` folder of this repo
 
-### Step 5: Configure the Extension
+### Step 3: Configure the Extension
 
 1. In Chrome extensions, find **StreamRatings** → Click the 3 dots → **Options**
-2. Fill in:
-   - **Backend URL**: Paste the URL from Step 3 (e.g., `https://your-project-name.replit.app`)
-   - **StreamRatings Secret**: Paste the secret you created in Step 2
-3. Click **Save Settings**
+2. Paste your key into **OMDb API Key** and click **Save Settings**
+
+That's it — no server needed. The extension calls OMDb directly.
+
+### Optional: Use a Backend Instead
+
+If you'd rather keep the OMDb key off the browser, run the included Express server
+(`npm install && npm run dev`, or deploy it anywhere) with `OMDB_API_KEY` and
+`STREAMRATINGS_SECRET` env vars set, then leave the OMDb key blank in Options and fill in
+**Backend URL** and **StreamRatings Secret** instead.
 
 ## Test It
 
@@ -59,9 +47,9 @@ When you browse movies and TV shows on Netflix, Prime Video, or Hotstar, a small
 ## Troubleshooting
 
 **No badges appearing?**
-- Check that Backend URL and Secret are correctly set in extension options
+- Check that your OMDb API key (or Backend URL + Secret) is set in extension options
 - Open the browser console (F12) and look for error messages
-- Make sure your Replit server is running (green "Running" indicator)
+- If using a backend, make sure the server is running (`/health` should return `{"ok":true}`)
 - Wait 2-3 seconds after loading a page (extension scans on a delay)
 
 **"Invalid secret" error?**
